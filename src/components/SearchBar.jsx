@@ -24,7 +24,7 @@ export function SearchBar({ defaultValue = '', onSearch }) {
   }
 
   return (
-    <form className="searchbar" onSubmit={handleSubmit}>
+    <form className="searchbar" onSubmit={handleSubmit} role="search">
       <input
         className="searchbar__input"
         type="text"
@@ -32,6 +32,8 @@ export function SearchBar({ defaultValue = '', onSearch }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         aria-label="Search movies"
+        id="search-input"
+        name="search"
       />
       <button className="btn" type="submit">Search</button>
     </form>

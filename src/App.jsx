@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import './App.css'
 import { SearchBar } from './components/SearchBar.jsx'
 import { MovieGrid } from './components/MovieGrid.jsx'
@@ -8,15 +8,16 @@ import { FiltersBar } from './components/FiltersBar.jsx'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
 
 function App() {
-  const [query, setQuery] = useState('batman')
+  const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState(null)
   const [filters, setFilters] = useState({ type: '', year: '' })
-  const [sort, setSort] = useState('relevance')
+  const [sort, setSort] = useState('year-desc')
   const [onlyFavorites, setOnlyFavorites] = useState(false)
   const [favorites, setFavorites] = useLocalStorage('mf_favorites', [])
   const favoritesSet = useMemo(() => new Set(favorites), [favorites])
-  const sentinelRef = useMemo(() => ({ current: null }), [])
+  const sentinelRef = useRef(null)
+  const loadingMoreRef = useRef(false)
 
   const apiKey = import.meta.env.VITE_OMDB_API_KEY || '42049448'
 
@@ -27,7 +28,6 @@ function App() {
     error,
     hasMore,
     search,
-    reset,
   } = useOmdbSearch(apiKey)
 
   useEffect(() => {
@@ -35,11 +35,14 @@ function App() {
     setPage(1)
   }, [query, filters, search])
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMoreRef.current || loading || error || !hasMore) return
+    loadingMoreRef.current = true
     const nextPage = page + 1
-    search(query, nextPage, filters)
+    await search(query, nextPage, filters)
     setPage(nextPage)
-  }
+    loadingMoreRef.current = false
+  }, [page, search, query, filters, loading, error, hasMore])
 
   const handleSelect = (movie) => {
     setSelected(movie)
@@ -55,19 +58,24 @@ function App() {
   }, [apiKey])
 
   const visibleMovies = useMemo(() => {
+    const effectiveSort = sort
     let list = movies
     if (onlyFavorites) {
       list = list.filter(m => favoritesSet.has(m.imdbID))
     }
-    switch (sort) {
+    const parseYear = (y) => {
+      const m = String(y || '').match(/\d{4}/)
+      return m ? parseInt(m[0], 10) : 0
+    }
+    switch (effectiveSort) {
       case 'title-asc':
         return [...list].sort((a, b) => a.Title.localeCompare(b.Title))
       case 'title-desc':
         return [...list].sort((a, b) => b.Title.localeCompare(a.Title))
       case 'year-asc':
-        return [...list].sort((a, b) => (a.Year || '').localeCompare(b.Year || ''))
+        return [...list].sort((a, b) => parseYear(a.Year) - parseYear(b.Year))
       case 'year-desc':
-        return [...list].sort((a, b) => (b.Year || '').localeCompare(a.Year || ''))
+        return [...list].sort((a, b) => parseYear(b.Year) - parseYear(a.Year))
       default:
         return list
     }
@@ -91,18 +99,21 @@ function App() {
   }
 
   useEffect(() => {
-    if (!sentinelRef.current) return
-    if (!hasMore) return
     const el = sentinelRef.current
+    if (!el) return
+    if (!hasMore) return
     const obs = new IntersectionObserver((entries) => {
       const first = entries[0]
-      if (first.isIntersecting && !loading && !error) {
-        handleLoadMore()
+      if (first.isIntersecting && !loading && !error && !loadingMoreRef.current) {
+        void handleLoadMore()
       }
-    }, { root: null, rootMargin: '200px', threshold: 0 })
+    }, { root: null, rootMargin: '600px', threshold: 0 })
     obs.observe(el)
-    return () => obs.disconnect()
-  }, [sentinelRef, loading, error, hasMore]) 
+    return () => {
+      obs.unobserve(el)
+      obs.disconnect()
+    }
+  }, [loading, error, hasMore, handleLoadMore]) 
 
   return (
     <div className="app">
@@ -110,11 +121,13 @@ function App() {
         <h1 className="app__title">Movie Finder</h1>
         {headerNote && <p className="app__note">{headerNote}</p>}
         <div className="app__controls">
-          <label className="switch">
+          <label className="switch" htmlFor="favorites-only-header">
             <input
               type="checkbox"
               checked={onlyFavorites}
               onChange={(e) => setOnlyFavorites(e.target.checked)}
+              id="favorites-only-header"
+              name="onlyFavoritesHeader"
             />
             Favorites only
           </label>
@@ -125,12 +138,9 @@ function App() {
         defaultValue={query}
         onSearch={(value) => {
           const trimmed = value.trim()
-          if (!trimmed) {
-            reset()
-            setQuery('')
-            return
-          }
           setQuery(trimmed)
+          // Prefer newest when empty search
+          if (trimmed === '') setSort('year-desc')
         }}
       />
 
@@ -143,7 +153,10 @@ function App() {
       />
 
       <section className="results-meta">
-        {totalResults > 0 && (
+        {totalResults > 0 && query === '' && (
+          <p>Latest releases (newest first)</p>
+        )}
+        {totalResults > 0 && query !== '' && (
           <p>
             Showing {visibleMovies.length} of {totalResults} results for "{query}"
           </p>
@@ -165,7 +178,7 @@ function App() {
             Load more
           </button>
         )}
-        <div ref={(el) => (sentinelRef.current = el)} />
+        <div className="infinite-sentinel" ref={sentinelRef} />
       </div>
 
       <MovieDetailModal movie={selected} onClose={handleCloseModal} apiKey={apiKey} />

@@ -2,7 +2,19 @@ export function MovieCard({ movie, onClick, isFavorite = false, onToggleFavorite
   const { Title, Year, Poster, Type } = movie
   const isPlaceholder = !Poster || Poster === 'N/A'
   return (
-    <button className="movie-card" onClick={() => onClick?.(movie)} aria-label={`Open details for ${Title}`}>
+    <div
+      className="movie-card"
+      role="button"
+      tabIndex={0}
+      onClick={() => onClick?.(movie)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.(movie)
+        }
+      }}
+      aria-label={`Open details for ${Title}`}
+    >
       <div className="movie-card__poster">
         <button
           type="button"
@@ -23,7 +35,7 @@ export function MovieCard({ movie, onClick, isFavorite = false, onToggleFavorite
         <h3 className="movie-card__title">{Title}</h3>
         <p className="movie-card__info">{Year} • {Type}</p>
       </div>
-    </button>
+    </div>
   )
 }
 

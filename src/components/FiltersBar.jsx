@@ -7,6 +7,8 @@ export function FiltersBar({ type, year, sort, onlyFavorites, onChange }) {
           value={type}
           onChange={(e) => onChange({ type: e.target.value })}
           aria-label="Filter by type"
+          id="filter-type"
+          name="type"
         >
           <option value="">All types</option>
           <option value="movie">Movies</option>
@@ -24,6 +26,8 @@ export function FiltersBar({ type, year, sort, onlyFavorites, onChange }) {
           onChange={(e) => onChange({ year: e.target.value })}
           aria-label="Filter by year"
           style={{ width: 120 }}
+          id="filter-year"
+          name="year"
         />
       </div>
       <div>
@@ -32,6 +36,8 @@ export function FiltersBar({ type, year, sort, onlyFavorites, onChange }) {
           value={sort}
           onChange={(e) => onChange({ sort: e.target.value })}
           aria-label="Sort results"
+          id="sort-select"
+          name="sort"
         >
           <option value="relevance">Relevance</option>
           <option value="title-asc">Title A→Z</option>
@@ -40,11 +46,13 @@ export function FiltersBar({ type, year, sort, onlyFavorites, onChange }) {
           <option value="year-asc">Oldest</option>
         </select>
       </div>
-      <label className="switch">
+      <label className="switch" htmlFor="favorites-only">
         <input
           type="checkbox"
           checked={onlyFavorites}
           onChange={(e) => onChange({ onlyFavorites: e.target.checked })}
+          id="favorites-only"
+          name="onlyFavorites"
         />
         Favorites only
       </label>
